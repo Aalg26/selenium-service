@@ -11,6 +11,7 @@ El servicio mantiene una sesión de Chrome abierta entre peticiones
 para mayor velocidad y consistencia de cookies/sesión con fbref.
 """
 import time
+import os
 import uvicorn
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
@@ -29,9 +30,12 @@ def get_driver():
     """Inicializa o reutiliza el driver de Selenium."""
     global _driver
     if _driver is None:
-        
-        print("🚀 Iniciando navegador Chrome indetectable...")
-        _driver = Driver(uc=True, headless=False,locale_code="es-ES")
+        # Leer configuración desde variables de entorno para entornos cloud
+        headless_env = os.getenv("HEADLESS", "true").lower()
+        headless = headless_env in ("1", "true", "yes")
+
+        print("🚀 Iniciando navegador Chrome indetectable... (headless=%s)" % headless)
+        _driver = Driver(uc=True, headless=headless, locale_code="es-ES")
         print("✅ Navegador listo.")
     return _driver
 
@@ -101,5 +105,6 @@ def shutdown_event():
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=5555, reload=False)
+    port = int(os.getenv("PORT", 5555))
+    uvicorn.run(app, host="0.0.0.0", port=port, reload=False)
 
