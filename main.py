@@ -1,0 +1,105 @@
+"""
+Scraper Service — Microservicio de Scraping con SeleniumBase
+============================================================
+Ejecutar con:
+    python scraper_service/main.py
+
+O con uvicorn:
+    uvicorn scraper_service.main:app --host 0.0.0.0 --port 5555
+
+El servicio mantiene una sesión de Chrome abierta entre peticiones
+para mayor velocidad y consistencia de cookies/sesión con fbref.
+"""
+import time
+import uvicorn
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from seleniumbase import Driver
+
+app = FastAPI(
+    title="Scraper Service",
+    description="Microservicio independiente que usa SeleniumBase para bypassear Cloudflare Turnstile.",
+    version="1.0.0"
+)
+
+# Driver global reutilizado entre peticiones para evitar abrir Chrome en cada request
+_driver = None
+
+def get_driver():
+    """Inicializa o reutiliza el driver de Selenium."""
+    global _driver
+    if _driver is None:
+        
+        print("🚀 Iniciando navegador Chrome indetectable...")
+        _driver = Driver(uc=True, headless=False,locale_code="es-ES")
+        print("✅ Navegador listo.")
+    return _driver
+
+
+class ScrapeRequest(BaseModel):
+    url: str
+
+
+class ScrapeResponse(BaseModel):
+    html: str
+    status: str = "ok"
+
+
+@app.get("/health")
+def health_check():
+    """Endpoint para verificar que el servicio está activo."""
+    return {"status": "running", "browser_active": _driver is not None}
+
+
+@app.post("/scrape", response_model=ScrapeResponse)
+def scrape_url(request: ScrapeRequest):
+    """
+    Recibe una URL y devuelve el HTML de la página tras pasar Cloudflare.
+    Mantiene la misma sesión de Chrome entre peticiones.
+    """
+    try:
+        driver = get_driver()
+        print(f"🌐 Navegando a {request.url}")
+        driver.uc_open_with_reconnect(request.url, 4)
+
+        # Intenta hacer clic en el CAPTCHA si aparece
+        try:
+            driver.uc_gui_click_captcha()
+            time.sleep(3)
+        except Exception:
+            pass  # No hay captcha, continuar
+
+        html = driver.page_source
+
+        # Verificación: detectar si Cloudflare bloqueó
+        if "Just a moment" in html or 'id="challenge-running"' in html:
+            raise HTTPException(
+                status_code=403,
+                detail="Cloudflare Turnstile detectado. El navegador no pudo resolverlo."
+            )
+
+        print(f"✅ Página obtenida correctamente: {driver.title}")
+        return ScrapeResponse(html=html)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        # Si el driver murió, limpiamos para que se reinicie en la próxima petición
+        global _driver
+        _driver = None
+        raise HTTPException(status_code=500, detail=f"Error interno del scraper: {str(e)}")
+
+
+@app.on_event("shutdown")
+def shutdown_event():
+    """Cierra el navegador al apagar el servicio."""
+    global _driver
+    if _driver:
+        print("🛑 Cerrando navegador...")
+        _driver.quit()
+        _driver = None
+
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=5555, reload=False)
+
