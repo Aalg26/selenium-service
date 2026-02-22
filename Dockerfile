@@ -33,12 +33,12 @@ RUN wget -q -O /tmp/google-chrome-stable_current_amd64.deb https://dl.google.com
 
 WORKDIR /app
 
-# Install Python deps
+# Install Python deps (expects requirements.txt inside scraper_service/)
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application
-COPY scraper_service/ ./scraper_service
+# Copy application source (Dockerfile is inside scraper_service/ so this copies the package files)
+COPY . .
 
 EXPOSE 5555
 
@@ -46,4 +46,4 @@ EXPOSE 5555
 ENV PORT=5555
 ENV HEADLESS=true
 
-CMD ["sh", "-c", "uvicorn scraper_service.main:app --host 0.0.0.0 --port $PORT"]
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port $PORT"]
