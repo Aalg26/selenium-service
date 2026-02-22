@@ -35,7 +35,8 @@ def get_driver():
         headless = headless_env in ("1", "true", "yes")
 
         print("🚀 Iniciando navegador Chrome indetectable... (headless=%s)" % headless)
-        _driver = Driver(uc=True, headless=headless, locale_code="es-ES")
+        _driver = Driver(uc=True,headless2=headless,agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36"
+)
         print("✅ Navegador listo.")
     return _driver
 
