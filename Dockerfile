@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     fonts-liberation \
     xvfb \
+    xauth \
     libnss3 \
     libxss1 \
     libasound2 \
