@@ -45,8 +45,7 @@ def get_driver():
             uc=True,
             headless2=headless,
             proxy=proxy_url,
-            no_sandbox=True,
-            disable_dev_shm_usage=True
+            no_sandbox=True
         )
         logger.info("✅ Navegador listo.")
     return _driver
