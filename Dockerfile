@@ -1,11 +1,12 @@
 FROM python:3.11-slim
 
-# Install packages required by Chrome
+# Añadimos xvfb a tu lista de paquetes
 RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     gnupg \
     ca-certificates \
     fonts-liberation \
+    xvfb \
     libnss3 \
     libxss1 \
     libasound2 \
@@ -24,7 +25,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     unzip \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Google Chrome
 RUN wget -q -O /tmp/google-chrome-stable_current_amd64.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb \
     && apt-get update \
     && apt-get install -y /tmp/google-chrome-stable_current_amd64.deb || true \
@@ -33,17 +33,16 @@ RUN wget -q -O /tmp/google-chrome-stable_current_amd64.deb https://dl.google.com
 
 WORKDIR /app
 
-# Install Python deps (expects requirements.txt inside scraper_service/)
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application source (Dockerfile is inside scraper_service/ so this copies the package files)
 COPY . .
 
 EXPOSE 5555
 
-# Defaults: run headless and listen on PORT
 ENV PORT=5555
 ENV HEADLESS=true
 
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port $PORT"]
+# EL CAMBIO MÁS IMPORTANTE: Usamos xvfb-run para simular el monitor 
+# al levantar tu API de FastAPI/Uvicorn
+CMD ["sh", "-c", "xvfb-run -a uvicorn main:app --host 0.0.0.0 --port $PORT"]
