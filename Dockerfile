@@ -1,11 +1,13 @@
 FROM python:3.11-slim
 
-# Añadimos xvfb a tu lista de paquetes
+# Añadimos xvfb y múltiples fuentes para engañar a los chequeos de bot rendering
 RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     gnupg \
     ca-certificates \
     fonts-liberation \
+    fonts-noto-color-emoji \
+    fonts-noto-cjk \
     xvfb \
     xauth \
     libnss3 \
@@ -24,6 +26,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libx11-6 \
     libxext6 \
     unzip \
+    python3-tk \
+    python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 RUN wget -q -O /tmp/google-chrome-stable_current_amd64.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb \
@@ -32,18 +36,28 @@ RUN wget -q -O /tmp/google-chrome-stable_current_amd64.deb https://dl.google.com
     && rm -f /tmp/google-chrome-stable_current_amd64.deb \
     && rm -rf /var/lib/apt/lists/*
 
+RUN useradd -m -s /bin/bash appuser
+
 WORKDIR /app
 
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
+
+RUN sbase install chromedriver || true
+RUN chmod -R 777 /usr/local/lib/python3.11/site-packages/seleniumbase/drivers || true
+
 COPY . .
+
+RUN chown -R appuser:appuser /app
+
+USER appuser
 
 EXPOSE 5555
 
 ENV PORT=5555
-ENV HEADLESS=true
+ENV HEADLESS=false
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
 
-# EL CAMBIO MÁS IMPORTANTE: Usamos xvfb-run para simular el monitor 
-# al levantar tu API de FastAPI/Uvicorn
-CMD ["sh", "-c", "xvfb-run -a uvicorn main:app --host 0.0.0.0 --port $PORT"]
+CMD ["sh", "-c", "xvfb-run -a --server-args='-screen 0 800x600x24' uvicorn main:app --host 0.0.0.0 --port $PORT"]

@@ -40,12 +40,11 @@ def get_driver():
 
         logger.info(f"🚀 Iniciando Chrome indetectable... (headless={headless}, proxy={proxy_url})")
         
-        # 3. Parámetros estrictos para que Chrome sobreviva dentro de Docker
         _driver = Driver(
             uc=True,
             headless2=headless,
             proxy=proxy_url,
-            no_sandbox=True
+            chromium_arg="--disable-dev-shm-usage,--no-sandbox,--disable-gpu,--no-zygote,--single-process"
         )
         logger.info("✅ Navegador listo.")
     return _driver
@@ -79,10 +78,21 @@ def scrape_url(request: ScrapeRequest):
         logger.info(f"Título de la página: {title}")
         
         if "Just a moment" in title or "Un momento" in title:
-            raise HTTPException(
-                status_code=403,
-                detail="Cloudflare Turnstile detectado en el título. El navegador no pudo resolverlo."
-            )
+            logger.info("Cloudflare detectado. Intentando resolver captcha de forma interactiva...")
+            try:
+                driver.uc_gui_handle_cf()
+                logger.info("Interacción con Cloudflare enviada.")
+            except Exception as e:
+                logger.warning(f"Advertencia al usar uc_gui_handle_cf: {e}")
+                
+            time.sleep(5)
+            title = driver.title
+            
+            if "Just a moment" in title or "Un momento" in title:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Cloudflare Turnstile detectado en el título. El navegador no pudo resolverlo tras reitento."
+                )
 
         html = driver.page_source
 
