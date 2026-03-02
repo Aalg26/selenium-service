@@ -1,7 +1,10 @@
 IMAGE_NAME = scraper-service
 PORT = 5555
 
-.PHONY: build run run-env stop
+PROJECT_ID ?= ""
+SERVICE_ACCOUNT ?= ""
+
+.PHONY: build run run-env stop deploy
 build:
 	docker build -t $(IMAGE_NAME) .
 
@@ -13,3 +16,13 @@ run-env:
 
 stop:
 	docker stop $(IMAGE_NAME)
+
+deploy:
+	@if [ -z "$(PROJECT_ID)" ] || [ -z "$(SERVICE_ACCOUNT)" ]; then \
+		echo "Error: Las variables PROJECT_ID o SERVICE_ACCOUNT están vacías."; \
+		exit 1; \
+	fi
+	@echo "🔧 Seteando el proyecto activo en gcloud..."
+	gcloud config set project $(PROJECT_ID)
+	@echo "🚀 Desplegando en $(PROJECT_ID)..."
+	gcloud builds submit --config cloudbuild.yaml --project $(PROJECT_ID) --substitutions=_SERVICE_ACCOUNT=$(SERVICE_ACCOUNT) .

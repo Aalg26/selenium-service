@@ -1,6 +1,5 @@
 FROM python:3.11-slim
 
-# Añadimos xvfb y múltiples fuentes para engañar a los chequeos de bot rendering
 RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     gnupg \
@@ -60,4 +59,4 @@ ENV HEADLESS=false
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
 
-CMD ["sh", "-c", "xvfb-run -a --server-args='-screen 0 800x600x24' uvicorn main:app --host 0.0.0.0 --port $PORT"]
+CMD ["sh", "-c", "xvfb-run -a --server-args='-screen 0 800x600x24' uvicorn main:app --host 0.0.0.0 --port $PORT --reload"]

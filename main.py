@@ -26,27 +26,44 @@ logger = logging.getLogger(__name__)
 
 # Driver global reutilizado entre peticiones para evitar abrir Chrome en cada request
 _driver = None
+_request_count = 0
+MAX_REQUESTS_BEFORE_RESTART = 50
 
 def get_driver():
     """Inicializa o reutiliza el driver de Selenium con soporte para Docker y Proxy."""
-    global _driver
+    global _driver, _request_count
+
+    if _driver is not None and _request_count >= MAX_REQUESTS_BEFORE_RESTART:
+        logger.info(f"♻️ Límite de {MAX_REQUESTS_BEFORE_RESTART} peticiones alcanzado. Reiniciando Chrome para liberar RAM...")
+        try:
+            _driver.quit()
+        except:
+            pass
+        _driver = None
+        _request_count = 0
+
     if _driver is None:
-        # 1. Leer variables de entorno
         headless_env = os.getenv("HEADLESS", "true").lower()
         headless = headless_env in ("1", "true", "yes")
         
-        # 2. Capturar el proxy desde las variables de entorno (¡VITAL PARA LA NUBE!)
-        proxy_url = os.getenv("PROXY_URL", None)
 
         logger.info(f"🚀 Iniciando Chrome indetectable... (headless={headless}, proxy={proxy_url})")
-        
+
+        safe_memory_flags = ",".join([
+            "--disable-dev-shm-usage",
+            "--no-sandbox",
+            #"--disable-extensions",
+        ])
+
         _driver = Driver(
             uc=True,
             headless2=headless,
             proxy=proxy_url,
-            chromium_arg="--disable-dev-shm-usage,--no-sandbox,--disable-gpu,--no-zygote,--single-process"
+            chromium_arg=safe_memory_flags
         )
         logger.info("✅ Navegador listo.")
+        
+    _request_count += 1
     return _driver
 
 class ScrapeRequest(BaseModel):
@@ -97,19 +114,26 @@ def scrape_url(request: ScrapeRequest):
         html = driver.page_source
 
         logger.info(f"✅ Página obtenida correctamente: {driver.title}")
+        
+        try:
+            driver.get("about:blank")
+        except:
+            pass
+            
         return ScrapeResponse(html=html)
 
     except HTTPException:
         raise
     except Exception as e:
 
-        global _driver
+        global _driver, _request_count
         if _driver:
             try:
                 _driver.quit()
             except:
                 pass
         _driver = None
+        _request_count = 0
         raise HTTPException(status_code=500, detail=f"Error interno del scraper: {str(e)}")
 
 @app.on_event("shutdown")
